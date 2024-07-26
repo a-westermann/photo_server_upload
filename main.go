@@ -8,6 +8,8 @@ import (
 )
 
 func main() {
+	// Check if there are any files to copy to the server
+
 	host := "192.168.1.86" // := -> declare and assign a variable at the same time
 	user := "andweste"
 	port := 22
