@@ -18,19 +18,38 @@ var user = "andweste"
 var port = 22
 var privateKeyPath = "C:\\Users\\Andrew\\Code Projects\\Pi_Photo_Saver\\photo_saver_server\\private_key.ppk"
 var uploadPath = "\\home\\andweste\\AshleyUploadPhotos\\"
+var logFilePath = "logfile.txt"
+var logFile *os.File
 
 func main() {
-	pollFoloder()
+	// Try to get Stat on the file. If error, it means it doesn't exist. So create it
+	if _, err := os.Stat(logFilePath); err != nil {
+		_, err := os.Create(logFilePath)
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	// Open the log file w/ appending privileges
+	logFile, _ = os.OpenFile(logFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+
+	defer logFile.Close()
+	logFile.Write([]byte(fmt.Sprintf("\nbeginning program: %s", time.DateTime)))
+
+	pollFolder()
 }
 
 func pollFolder() {
 	// Check if there are any files to copy to the server
 	files := check_for_files(localDir)
-	if files != nil && files.len > 0 {
-		send_files(files)
+	if files != nil && len(files) > 0 {
+		logFile.Write([]byte(fmt.Sprintf("\nFound photos to upload: %s", time.DateTime)))
+		sendFiles(files)
 	}
 
+	logFile.Write([]byte(fmt.Sprintf("\nNothing to upload...: %s", time.DateTime)))
 	time.Sleep(3 * time.Minute)
+
 	pollFolder()
 }
 
@@ -63,9 +82,9 @@ func sendFiles(files []os.DirEntry) {
 	}
 	defer sftpClient.Close()
 
-	for i, file := range files {
-		upload(sftpClient, fmt.Sprintf("%s%d", localDir, file.Name()),
-			fmt.Sprintf("%s%d", uploadPath, file.Name()))
+	for _, file := range files {
+		upload(sftpClient, fmt.Sprintf("%s%s", localDir, file.Name()),
+			fmt.Sprintf("%s%s", uploadPath, file.Name()))
 
 		//download(sftpClient, fmt.Sprintf("/home/andweste/AshleyPictures/%s", filename),
 		//	filename)
@@ -92,6 +111,17 @@ func download(sftpClient *sftp.Client, srcPath string, destinationPath string) {
 
 func upload(sftpClient *sftp.Client, srcPath string, destinationPath string) {
 	sourceFile, err := os.Open(srcPath)
+	if err != nil {
+		logFile.Write([]byte(fmt.Sprintf("\nerror getting source file: %s", err)))
+	}
+
+	destinationFile, err := sftpClient.Create(fmt.Sprintf("%s%s", uploadPath, sourceFile.Name()))
+	if err != nil {
+		logFile.Write([]byte(fmt.Sprintf("\nerror creating destination file: %s", err)))
+	}
+	defer destinationFile.Close()
+
+	destinationFile.ReadFrom(sourceFile)
 }
 
 func check_for_files(path string) []os.DirEntry {
