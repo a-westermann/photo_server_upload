@@ -5,16 +5,37 @@ import (
 	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
 	"os"
+	"time"
 )
 
-func main() {
-	// Check if there are any files to copy to the server
+// Sleep 3 min until find a file in the local directory
+// Copy it over to the server
+// Delete the local file if it is successful
 
-	host := "192.168.1.86" // := -> declare and assign a variable at the same time
-	user := "andweste"
-	port := 22
-	// Private key
-	pemBytes, err := os.ReadFile("H:\\Coding\\Python Projects\\RaspberryPi\\private_key_ftp")
+var localDir = "C:\\Users\\Andrew\\Code Projects\\Pi_Photo_Saver\\photo_saver_server\\UploadPhotos\\"
+var host = "192.168.1.86" // := -> declare and assign a variable at the same time
+var user = "andweste"
+var port = 22
+var privateKeyPath = "C:\\Users\\Andrew\\Code Projects\\Pi_Photo_Saver\\photo_saver_server\\private_key.ppk"
+var uploadPath = "\\home\\andweste\\AshleyUploadPhotos\\"
+
+func main() {
+	pollFoloder()
+}
+
+func pollFolder() {
+	// Check if there are any files to copy to the server
+	files := check_for_files(localDir)
+	if files != nil && files.len > 0 {
+		send_files(files)
+	}
+
+	time.Sleep(3 * time.Minute)
+	pollFolder()
+}
+
+func sendFiles(files []os.DirEntry) {
+	pemBytes, err := os.ReadFile(privateKeyPath)
 	signer, err := ssh.ParsePrivateKey(pemBytes)
 	auths := []ssh.AuthMethod{ssh.PublicKeys(signer)} // normal Array declaration
 
@@ -42,9 +63,13 @@ func main() {
 	}
 	defer sftpClient.Close()
 
-	filename := "ashleyw-3.jpg"
-	download(sftpClient, fmt.Sprintf("/home/andweste/AshleyPictures/%s", filename),
-		filename)
+	for i, file := range files {
+		upload(sftpClient, fmt.Sprintf("%s%d", localDir, file.Name()),
+			fmt.Sprintf("%s%d", uploadPath, file.Name()))
+
+		//download(sftpClient, fmt.Sprintf("/home/andweste/AshleyPictures/%s", filename),
+		//	filename)
+	}
 }
 
 func download(sftpClient *sftp.Client, srcPath string, destinationPath string) {
@@ -63,5 +88,13 @@ func download(sftpClient *sftp.Client, srcPath string, destinationPath string) {
 	defer destinationFile.Close()
 
 	destinationFile.ReadFrom(sourceFile)
+}
 
+func upload(sftpClient *sftp.Client, srcPath string, destinationPath string) {
+	sourceFile, err := os.Open(srcPath)
+}
+
+func check_for_files(path string) []os.DirEntry {
+	files, _ := os.ReadDir(path)
+	return files
 }
